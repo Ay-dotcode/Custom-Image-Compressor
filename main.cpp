@@ -29,11 +29,11 @@ public:
 };
 #pragma pack(pop)
 
+bool saveAYFile(const string &, const ColorImage &);
+ColorImage loadAYFile(const string &);
 bool isSameColor(const RGBA &, const RGBA &);
 vector<uint8_t> compressRLE(const ColorImage &);
 ColorImage decompressRLE(const vector<uint8_t> &, uint32_t, uint32_t);
-bool saveAYFile(const string &, const ColorImage &);
-ColorImage loadAYFile(const string &);
 
 int main() {
   cout << "\n  .ay Custom Image Compressor\n";
@@ -104,9 +104,6 @@ int main() {
   return 0;
 }
 
-bool isSameColor(const RGBA &p1, const RGBA &p2) {
-  return (p1.r == p2.r && p1.g == p2.g && p1.b == p2.b && p1.a == p2.a);
-}
 bool saveAYFile(const string &filename, const ColorImage &img) {
   AYHeader header(img.GetWidth(), img.GetHeight());
   vector<uint8_t> payload = compressRLE(img);
@@ -148,12 +145,70 @@ ColorImage loadAYFile(const string &filename) {
   return decompressRLE(payload, header.width, header.height);
 }
 
+bool isSameColor(const RGBA &p1, const RGBA &p2) {
+  return (p1.r == p2.r && p1.g == p2.g && p1.b == p2.b && p1.a == p2.a);
+}
+
 vector<uint8_t> compressRLE(const ColorImage &img) {
   vector<uint8_t> data;
+  int w = img.GetWidth();
+  int h = img.GetHeight();
+
+  if (w == 0 || h == 0)
+    return data;
+
+  RGBA currPix = img(0, 0);
+  uint8_t runLen = 0;
+
+  for (int y = 0; y < h; y++) {
+    for (int x = 0; x < w; x++) {
+      RGBA nextPixel = img(x, y);
+
+      if (isSameColor(currPix, nextPixel) && runLen < 255) {
+        runLen++;
+      } else {
+        data.push_back(runLen);
+        data.push_back(currPix.r);
+        data.push_back(currPix.g);
+        data.push_back(currPix.b);
+        data.push_back(currPix.a);
+
+        currPix = nextPixel;
+        runLen = 1;
+      }
+    }
+  }
+
+  data.push_back(runLen);
+  data.push_back(currPix.r);
+  data.push_back(currPix.g);
+  data.push_back(currPix.b);
+  data.push_back(currPix.a);
+
   return data;
 }
 
 ColorImage decompressRLE(const vector<uint8_t> &data, uint32_t w, uint32_t h) {
   ColorImage img(w, h);
+
+  int pixelIndex = 0;
+  size_t dataIndex = 0;
+
+  while (dataIndex < data.size() && pixelIndex < w * h) {
+    uint8_t runLen = data[dataIndex++];
+    uint8_t r = data[dataIndex++];
+    uint8_t g = data[dataIndex++];
+    uint8_t b = data[dataIndex++];
+    uint8_t a = data[dataIndex++];
+
+    RGBA color(r, g, b, a);
+
+    for (int i = 0; i < runLen; i++) {
+      int x = pixelIndex % w;
+      int y = pixelIndex / w;
+      img(x, y) = color;
+      pixelIndex++;
+    }
+  }
   return img;
 }

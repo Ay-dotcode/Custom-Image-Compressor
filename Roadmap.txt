@@ -1,19 +1,12 @@
 Phase 1: Defining the .ay Header
 Before you compress any pixels, your program needs to know how to read your file. You are essentially creating a custom struct that will sit at the very top of the binary data.
-
 The Magic Number: The first two bytes of your file should be the characters 'A' and 'Y'. When your decompressor runs, it checks these first. If they aren't there, the program throws an error: "Invalid file format!"
-
 Metadata: Immediately after the magic number, write out the image dimensions. You will need to save the width (4 bytes/int), height (4 bytes/int), and channels (e.g., 3 for RGB).
 
-The Checkpoint: Write a simple script that opens input.png using your provided library, writes this header to test.ay, reads it back, and prints the width and height to your console.
-
 Phase 2: Run-Length Encoding (RLE)
-Start with the easier compression algorithm. RLE is brilliant for images with large areas of flat color (like backgrounds or simple graphics).
-
+RLE is brilliant for images with large areas of flat color (like backgrounds or simple graphics).
 The Logic: Convert your 2D image into a flat 1D array of pixels. Loop through the array. Keep a counter of how many identical pixels you see in a row.
-
 The Output: Instead of saving {Red, Red, Red, Red, Blue}, you save {4, Red, 1, Blue}.
-
 The Catch: What if a run is longer than 255 pixels? A standard byte can only hold up to 255. You'll need to write logic that says, "If the count hits 255, save the chunk and start a new count."
 
 Phase 3: Huffman Coding (The Boss Level)
