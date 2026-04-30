@@ -276,7 +276,7 @@ ColorImage decompressRLE(const vector<uint8_t> &data, uint32_t w, uint32_t h) {
   size_t dataIdx = 0;
   int totPoss = w * h;
 
-  while (dataIdx + 4 < data.size() && pixIdx < totPoss) {
+  while (data.size() - dataIdx >= 5 && pixIdx < totPoss) {
     uint8_t len = data[dataIdx++];
     uint8_t r = data[dataIdx++], g = data[dataIdx++], b = data[dataIdx++],
             a = data[dataIdx++];
