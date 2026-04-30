@@ -14,14 +14,14 @@ public:
   char magic[2];
   uint32_t width;
   uint32_t height;
-  uint8_t channels;
+  uint32_t rleByteCount;
 
-  AYHeader() : width(0), height(0), channels(4) {
+  AYHeader() : width(0), height(0), rleByteCount(0) {
     magic[0] = 'A';
     magic[1] = 'Y';
   }
-  AYHeader(uint32_t w, uint32_t h, uint8_t c = 4)
-      : width(w), height(h), channels(c) {
+  AYHeader(uint32_t w, uint32_t h, uint32_t rleBytes)
+      : width(w), height(h), rleByteCount(rleBytes) {
     magic[0] = 'A';
     magic[1] = 'Y';
   }
@@ -35,8 +35,8 @@ struct HuffNode {
   unique_ptr<HuffNode> left;
   unique_ptr<HuffNode> right;
 
-  HuffNode(uint8_t val, uint32_t freq)
-      : byteVal(val), freq(freq), left(nullptr), right(nullptr) {}
+  HuffNode(uint8_t val, uint32_t f)
+      : byteVal(val), freq(f), left(nullptr), right(nullptr) {}
 
   HuffNode(unique_ptr<HuffNode> l, unique_ptr<HuffNode> r)
       : byteVal(0), freq(l->freq + r->freq), left(std::move(l)),
@@ -46,7 +46,9 @@ struct HuffNode {
 struct CompareNode {
   bool operator()(const unique_ptr<HuffNode> &l,
                   const unique_ptr<HuffNode> &r) {
-    return l->freq > r->freq;
+    if (l->freq != r->freq)
+      return l->freq > r->freq;
+    return l->byteVal > r->byteVal;
   }
 };
 
@@ -55,8 +57,8 @@ ColorImage loadAYFile(const string &);
 bool isSameColor(const RGBA &, const RGBA &);
 vector<uint8_t> compressRLE(const ColorImage &);
 ColorImage decompressRLE(const vector<uint8_t> &, uint32_t, uint32_t);
-unique_ptr<HuffNode> buildHuffmanTree(const vector<uint8_t> &);
 unique_ptr<HuffNode> rebuildTreeFromTable(uint32_t freq[256]);
+unique_ptr<HuffNode> buildHuffmanTree(const vector<uint8_t> &);
 void generateCodes(HuffNode *, string, unordered_map<uint8_t, string> &);
 
 int main() {
@@ -121,7 +123,8 @@ bool saveAYFile(const string &filename, const ColorImage &img) {
   if (!outFile)
     return false;
 
-  AYHeader header(img.GetWidth(), img.GetHeight());
+  AYHeader header(img.GetWidth(), img.GetHeight(),
+                  static_cast<uint32_t>(rlePayload.size()));
   outFile.write(reinterpret_cast<const char *>(&header), sizeof(AYHeader));
   outFile.write(reinterpret_cast<const char *>(freq), sizeof(freq));
 
@@ -129,13 +132,12 @@ bool saveAYFile(const string &filename, const ColorImage &img) {
   int bitCount = 0;
 
   for (uint8_t byte : rlePayload) {
-    string code = dictionary[byte];
+    const string &code = dictionary[byte];
     for (char bit : code) {
       bitBuffer <<= 1;
       if (bit == '1')
         bitBuffer |= 1;
-      bitCount++;
-      if (bitCount == 8) {
+      if (++bitCount == 8) {
         outFile.write(reinterpret_cast<const char *>(&bitBuffer), 1);
         bitBuffer = 0;
         bitCount = 0;
@@ -164,50 +166,40 @@ ColorImage loadAYFile(const string &filename) {
   inFile.read(reinterpret_cast<char *>(freq), sizeof(freq));
 
   unique_ptr<HuffNode> root = rebuildTreeFromTable(freq);
+  if (!root)
+    return ColorImage();
+
   vector<uint8_t> rleData;
+  rleData.reserve(header.rleByteCount);
   HuffNode *currentNode = root.get();
   uint8_t byte;
 
-  uint32_t totalPixels = header.width * header.height;
-  uint32_t pixelsDecoded = 0;
-
-  while (inFile.read(reinterpret_cast<char *>(&byte), 1)) {
-    for (int i = 7; i >= 0; i--) {
+  while (rleData.size() < header.rleByteCount &&
+         inFile.read(reinterpret_cast<char *>(&byte), 1)) {
+    for (int i = 7; i >= 0 && rleData.size() < header.rleByteCount; i--) {
       bool bit = (byte >> i) & 1;
       currentNode = bit ? currentNode->right.get() : currentNode->left.get();
 
       if (!currentNode->left && !currentNode->right) {
         rleData.push_back(currentNode->byteVal);
-        if (rleData.size() % 5 == 0)
-          pixelsDecoded += rleData[rleData.size() - 5];
         currentNode = root.get();
-        if (pixelsDecoded >= totalPixels)
-          break;
       }
     }
-    if (pixelsDecoded >= totalPixels)
-      break;
   }
   return decompressRLE(rleData, header.width, header.height);
-}
-
-unique_ptr<HuffNode> buildHuffmanTree(const vector<uint8_t> &data) {
-  uint32_t freq[256] = {0};
-  for (uint8_t byte : data)
-    freq[byte]++;
-  return rebuildTreeFromTable(freq);
 }
 
 unique_ptr<HuffNode> rebuildTreeFromTable(uint32_t freq[256]) {
   vector<unique_ptr<HuffNode>> heap;
   for (int i = 0; i < 256; i++)
     if (freq[i] > 0)
-      heap.push_back(make_unique<HuffNode>((uint8_t)i, freq[i]));
+      heap.push_back(make_unique<HuffNode>(static_cast<uint8_t>(i), freq[i]));
 
   if (heap.empty())
     return nullptr;
+
   if (heap.size() == 1)
-    heap.push_back(make_unique<HuffNode>((uint8_t)0, (uint32_t)0));
+    heap.push_back(make_unique<HuffNode>(static_cast<uint8_t>(0), 0u));
 
   make_heap(heap.begin(), heap.end(), CompareNode());
   while (heap.size() > 1) {
@@ -221,6 +213,12 @@ unique_ptr<HuffNode> rebuildTreeFromTable(uint32_t freq[256]) {
     push_heap(heap.begin(), heap.end(), CompareNode());
   }
   return std::move(heap.front());
+}
+unique_ptr<HuffNode> buildHuffmanTree(const vector<uint8_t> &data) {
+  uint32_t freq[256] = {0};
+  for (uint8_t b : data)
+    freq[b]++;
+  return rebuildTreeFromTable(freq);
 }
 
 void generateCodes(HuffNode *node, string path,
@@ -244,8 +242,10 @@ vector<uint8_t> compressRLE(const ColorImage &img) {
   int w = img.GetWidth(), h = img.GetHeight();
   if (w == 0 || h == 0)
     return data;
+
   RGBA currPix = img(0, 0);
   uint8_t runLen = 0;
+
   for (int y = 0; y < h; y++) {
     for (int x = 0; x < w; x++) {
       RGBA nextPixel = img(x, y);
@@ -274,15 +274,17 @@ ColorImage decompressRLE(const vector<uint8_t> &data, uint32_t w, uint32_t h) {
   ColorImage img(w, h);
   int pixIdx = 0;
   size_t dataIdx = 0;
-  int totPoss = w * h;
+  int totPix = static_cast<int>(w * h);
 
-  while (data.size() - dataIdx >= 5 && pixIdx < totPoss) {
+  while (data.size() - dataIdx >= 5 && pixIdx < totPix) {
     uint8_t len = data[dataIdx++];
-    uint8_t r = data[dataIdx++], g = data[dataIdx++], b = data[dataIdx++],
-            a = data[dataIdx++];
+    uint8_t r = data[dataIdx++];
+    uint8_t g = data[dataIdx++];
+    uint8_t b = data[dataIdx++];
+    uint8_t a = data[dataIdx++];
     RGBA color(r, g, b, a);
 
-    for (int i = 0; i < len && pixIdx < totPoss; i++) {
+    for (int i = 0; i < len && pixIdx < totPix; i++) {
       img(pixIdx % w, pixIdx / w) = color;
       pixIdx++;
     }
