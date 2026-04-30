@@ -36,26 +36,69 @@ bool saveAYFile(const string &, const ColorImage &);
 ColorImage loadAYFile(const string &);
 
 int main() {
-  ColorImage I;
-  I.Load("input.png");
+  cout << "\n  .ay Custom Image Compressor\n";
+  cout << "1. Encode (Compress PNG to .ay)\n";
+  cout << "2. Decode (Decompress .ay to PNG)\n";
+  cout << "3. Exit\n\n";
+  cout << "Select an option (1-3): ";
 
-  if (I.GetWidth() == 0 || I.GetHeight() == 0) {
-    cout << "Failed to load input.png!" << endl;
+  int choice;
+  if (!(cin >> choice)) {
+    cout << "Error: Invalid input format." << endl;
     return 1;
   }
 
-  cout << "Compressing and saving to output.ay..." << endl;
-  if (!saveAYFile("data.ay", I)) {
-    cout << "Failed to save .ay file!" << endl;
+  switch (choice) {
+  case 1: {
+    string inputPng, outputAy;
+    cout << "Enter the input PNG filename (e.g., input.png): ";
+    cin >> inputPng;
+    cout << "Enter the output .ay filename (e.g., data.ay): ";
+    cin >> outputAy;
+
+    ColorImage I;
+    I.Load(inputPng);
+
+    if (I.GetWidth() == 0 || I.GetHeight() == 0) {
+      cout << "Error: Failed to load " << inputPng << endl;
+      return 1;
+    }
+
+    cout << "Compressing and saving to " << outputAy << endl;
+    if (!saveAYFile(outputAy, I)) {
+      cout << "Error: Failed to save .ay file" << endl;
+      return 1;
+    }
+    cout << "Successfully encoded image to " << outputAy << endl;
+    break;
+  }
+  case 2: {
+    string inputAy, outputPng;
+
+    cout << "Enter the input .ay filename (e.g., data.ay): ";
+    cin >> inputAy;
+    cout << "Enter the output PNG filename (e.g., output.png): ";
+    cin >> outputPng;
+    cout << "Loading and decompressing from " << inputAy << endl;
+    ColorImage outputImg = loadAYFile(inputAy);
+
+    if (outputImg.GetWidth() > 0) {
+      outputImg.Save(outputPng);
+      cout << "Successfully reconstructed image to " << outputPng << endl;
+    } else {
+      cout << "Error: Failed to decompress or load .ay file" << endl;
+      return 1;
+    }
+    break;
+  }
+  case 3: {
+    cout << "Exiting program..." << endl;
+    return 0;
+  }
+  default: {
+    cout << "Error: Invalid option selected." << endl;
     return 1;
   }
-
-  cout << "Loading and decompressing from output.ay..." << endl;
-  ColorImage outputImg = loadAYFile("data.ay");
-
-  if (outputImg.GetWidth() > 0) {
-    outputImg.Save("output.png");
-    cout << "Successfully reconstructed image to output.png" << endl;
   }
 
   return 0;
