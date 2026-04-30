@@ -3,8 +3,10 @@ CXX = g++
 CXXFLAGS = -std=c++20 -O2 -w      # C++20, optimize, suppress warnings
 LDFLAGS = -lpng                    # link with libpng
 
+.PHONY: FORCE
+
 # Pattern rule: compile and run a .cpp file
-%: %.cpp
+%: %.cpp FORCE
 	@echo "🔧 Compiling $<..."
 	@$(CXX) $(CXXFLAGS) $< -o $@ $(LDFLAGS) && \
 	echo "🔧 Compilation successful!" && \
