@@ -195,28 +195,7 @@ unique_ptr<HuffNode> buildHuffmanTree(const vector<uint8_t> &data) {
   uint32_t freq[256] = {0};
   for (uint8_t byte : data)
     freq[byte]++;
-  vector<unique_ptr<HuffNode>> heap;
-  for (int i = 0; i < 256; i++)
-    if (freq[i] > 0)
-      heap.push_back(make_unique<HuffNode>((uint8_t)i, freq[i]));
-
-  if (heap.empty())
-    return nullptr;
-  if (heap.size() == 1)
-    heap.push_back(make_unique<HuffNode>((uint8_t)0, (uint32_t)0));
-
-  make_heap(heap.begin(), heap.end(), CompareNode());
-  while (heap.size() > 1) {
-    pop_heap(heap.begin(), heap.end(), CompareNode());
-    unique_ptr<HuffNode> left = std::move(heap.back());
-    heap.pop_back();
-    pop_heap(heap.begin(), heap.end(), CompareNode());
-    unique_ptr<HuffNode> right = std::move(heap.back());
-    heap.pop_back();
-    heap.push_back(make_unique<HuffNode>(std::move(left), std::move(right)));
-    push_heap(heap.begin(), heap.end(), CompareNode());
-  }
-  return std::move(heap.front());
+  return rebuildTreeFromTable(freq);
 }
 
 unique_ptr<HuffNode> rebuildTreeFromTable(uint32_t freq[256]) {
