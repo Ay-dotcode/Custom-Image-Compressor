@@ -133,6 +133,7 @@ bool saveAYFile(const string &filename, const ColorImage &img) {
 
   for (uint8_t byte : rlePayload) {
     const string &code = dictionary[byte];
+    
     for (char bit : code) {
       bitBuffer <<= 1;
       if (bit == '1')
