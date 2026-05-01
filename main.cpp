@@ -11,21 +11,28 @@ using namespace std;
 #pragma pack(push, 1)
 class AYHeader {
 public:
-  char magic[2];
+  char magic[4];
   uint32_t width;
   uint32_t height;
   uint32_t rleByteCount;
 
   AYHeader() : width(0), height(0), rleByteCount(0) {
-    magic[0] = 'A';
-    magic[1] = 'Y';
+    magic[0] = 'O';
+    magic[1] = 'W';
+    magic[2] = 'O';
+    magic[3] = 'Z';
   }
   AYHeader(uint32_t w, uint32_t h, uint32_t rleBytes)
       : width(w), height(h), rleByteCount(rleBytes) {
-    magic[0] = 'A';
-    magic[1] = 'Y';
+    magic[0] = 'O';
+    magic[1] = 'W';
+    magic[2] = 'O';
+    magic[3] = 'Z';
   }
-  bool isValid() const { return (magic[0] == 'A' && magic[1] == 'Y'); }
+  bool isValid() const {
+    return (magic[0] == 'O' && magic[1] == 'W' && magic[2] == 'O' &&
+            magic[3] == 'Z');
+  }
 };
 #pragma pack(pop)
 
@@ -63,46 +70,39 @@ void generateCodes(HuffNode *, string, unordered_map<uint8_t, string> &);
 
 int main() {
   cout << "\n  .ay Custom Image Compressor\n";
-  cout << "1. Encode (Compress PNG to .ay)\n";
-  cout << "2. Decode (Decompress .ay to PNG)\n";
-  cout << "3. Exit\n\n";
-  cout << "Select an option (1-3): ";
 
-  int choice;
-  if (!(cin >> choice))
+  string inputPng = "input.png";
+  string outputAy = "data.ay";
+  string outputPng = "output.png";
+
+  cout << "[1/2] Loading " << inputPng << " for compression...\n";
+  ColorImage I;
+  I.Load(inputPng);
+
+  if (I.GetWidth() == 0) {
+    cout << "Error: Could not find or load " << inputPng << endl;
     return 1;
+  }
 
-  switch (choice) {
-  case 1: {
-    string inputPng, outputAy;
-    cout << "Enter input PNG (e.g., input.png): ";
-    cin >> inputPng;
-    cout << "Enter output .ay (e.g., data.ay): ";
-    cin >> outputAy;
-    ColorImage I;
-    I.Load(inputPng);
-    if (I.GetWidth() == 0)
-      return 1;
-    if (saveAYFile(outputAy, I))
-      cout << "Success!\n";
-    break;
+  if (saveAYFile(outputAy, I)) {
+    cout << "      -> Successfully encoded to " << outputAy << "\n";
+  } else {
+    cout << "Error: Failed to save .ay file.\n";
+    return 1;
   }
-  case 2: {
-    string inputAy, outputPng;
-    cout << "Enter input .ay (e.g., data.ay): ";
-    cin >> inputAy;
-    cout << "Enter output PNG (e.g., output.png): ";
-    cin >> outputPng;
-    ColorImage out = loadAYFile(inputAy);
-    if (out.GetWidth() > 0) {
-      out.Save(outputPng);
-      cout << "Success!\n";
-    }
-    break;
+
+  cout << "[2/2] Loading " << outputAy << " for decompression...\n";
+  ColorImage out = loadAYFile(outputAy);
+
+  if (out.GetWidth() > 0) {
+    out.Save(outputPng);
+    cout << "      -> Successfully reconstructed to " << outputPng << "\n";
+  } else {
+    cout << "Error: Failed to decode .ay file.\n";
+    return 1;
   }
-  default:
-    return 0;
-  }
+
+  cout << "\nPipeline Complete!\n";
   return 0;
 }
 
