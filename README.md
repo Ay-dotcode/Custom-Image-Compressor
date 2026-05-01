@@ -95,7 +95,7 @@ Bytes 12-15:  RLE Compressed Byte Count (uint32_t)
 
 ```bash
 # Build and run everything
-make
+make rand_img main
 
 # Build and run the random image generator
 make rand_img
@@ -104,7 +104,6 @@ make rand_img
 make main
 
 # Clean build artifacts
-make clean
 ```
 
 ### Build Process
